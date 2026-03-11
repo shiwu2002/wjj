@@ -1,0 +1,18 @@
+{
+  "model": {
+    "base_url": "https://api-inference.modelscope.cn/v1",
+    "model_name": "Qwen/Qwen3.5-35B-A3B",
+    "api_key": "ms-fd50204a-9b29-40e0-a29a-1af24569e10f"
+  },
+  "agent": {
+    "max_steps": 100,
+    "device_id": null,
+    "verbose": true,
+    "lang": "cn"
+  },
+  "device": {
+    "type": "adb",
+    "remote_address": null,
+    "auto_connect": false
+  }
+}
