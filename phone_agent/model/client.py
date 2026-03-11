@@ -2,6 +2,7 @@
 
 import json
 import time
+import httpx
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -48,7 +49,15 @@ class ModelClient:
 
     def __init__(self, config: ModelConfig | None = None):
         self.config = config or ModelConfig()
-        self.client = OpenAI(base_url=self.config.base_url, api_key=self.config.api_key)
+        
+        # Create HTTP client with SSL verification disabled for local development
+        http_client = httpx.Client(verify=False)
+        
+        self.client = OpenAI(
+            base_url=self.config.base_url, 
+            api_key=self.config.api_key,
+            http_client=http_client
+        )
 
     def request(self, messages: list[dict[str, Any]]) -> ModelResponse:
         """
