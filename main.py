@@ -57,24 +57,12 @@ def check_system_requirements(
             print(
                 "     - Windows: Download from https://developer.android.com/studio/releases/platform-tools"
             )
-        elif device_type == DeviceType.HDC:
-            print(
-                "     - Download from HarmonyOS SDK or https://gitee.com/openharmony/docs"
-            )
-            print("     - Add to PATH environment variable")
-        else:  # IOS
-            print("     - macOS: brew install libimobiledevice")
-            print("     - Linux: sudo apt-get install libimobiledevice-utils")
         all_passed = False
     else:
         # Double check by running version command
         try:
             if device_type == DeviceType.ADB:
                 version_cmd = [tool_cmd, "version"]
-            elif device_type == DeviceType.HDC:
-                version_cmd = [tool_cmd, "-v"]
-            else:  # IOS
-                version_cmd = [tool_cmd, "-ln"]
 
             result = subprocess.run(
                 version_cmd, capture_output=True, text=True, timeout=10
@@ -113,13 +101,6 @@ def check_system_requirements(
             devices = [
                 line for line in lines[1:] if line.strip() and "\tdevice" in line
             ]
-        elif device_type == DeviceType.HDC:
-            result = subprocess.run(
-                ["hdc", "list", "targets"], capture_output=True, text=True, timeout=10
-            )
-            lines = result.stdout.strip().split("\n")
-            devices = [line for line in lines if line.strip()]
-
         if not devices:
             print("❌ FAILED")
             print("   Error: No devices connected.")
