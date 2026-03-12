@@ -1,23 +1,22 @@
 """
-Phone Agent - 一个 AI 驱动的手机自动化框架。
+PhoneAgent 包。
 
-此包提供用于使用 AI 模型进行视觉理解和决策来自动化 Android 和 iOS 手机交互的工具。
+基于视觉语言模型的 Android 手机自动化工具。
 """
 
-from phone_agent.agent import PhoneAgent
+from phone_agent.agent import PhoneAgent, AgentConfig, StepResult
+from phone_agent.model import ModelConfig
+from phone_agent.history import TaskHistoryManager, get_history_manager
+from phone_agent.utils.logger import setup_logger
 
-# 尝试导入 iOS 代理（如果存在）
-try:
-    from phone_agent.agent_ios import IOSPhoneAgent
-except ImportError:
-    IOSPhoneAgent = None
-
-# 尝试导入技能模块（如果存在）
-try:
-    from phone_agent.skill import PhoneAgentExecutor, create_executor
-except ImportError:
-    PhoneAgentExecutor = None
-    create_executor = None
-
-__version__ = "0.1.0"
-__all__ = ["PhoneAgent", "IOSPhoneAgent", "PhoneAgentExecutor", "create_executor"]
+__version__ = '1.0.0'
+__author__ = 'Your Name'
+__all__ = [
+    'PhoneAgent',
+    'AgentConfig', 
+    'StepResult',
+    'ModelConfig',
+    'TaskHistoryManager',
+    'get_history_manager',
+    'setup_logger',
+]

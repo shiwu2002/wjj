@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhoneAgent - 手机自动化代理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea.form-control {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .history-table th,
+        .history-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .history-table th {
+            background: #f5f7fa;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .history-table tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .result-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #667eea;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .alert {
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 PhoneAgent</h1>
+            <p>AI 驱动的手机自动化代理系统</p>
+        </div>
+        
+        <!-- 任务执行卡片 -->
+        <div class="card">
+            <h2>🚀 执行任务</h2>
+            
+            <div id="messageArea"></div>
+            
+            <div class="form-group">
+                <label for="taskInput">任务描述</label>
+                <textarea 
+                    id="taskInput" 
+                    class="form-control" 
+                    placeholder="请输入要执行的任务，例如：打开微信并给张三发消息：晚上好"
+                ></textarea>
+            </div>
+            
+            <button id="executeBtn" class="btn" onclick="executeTask()">
+                执行任务
+            </button>
+            
+            <div id="resultArea" class="result-box" style="display: none;">
+                <div class="result-title">执行结果:</div>
+                <div id="resultContent"></div>
+            </div>
+        </div>
+        
+        <!-- 统计信息卡片 -->
+        <div class="card">
+            <h2>📊 统计信息</h2>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalTasks">-</div>
+                    <div class="stat-label">总任务数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="successRate">-</div>
+                    <div class="stat-label">成功率</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgSteps">-</div>
+                    <div class="stat-label">平均步数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgDuration">-</div>
+                    <div class="stat-label">平均耗时 (秒)</div>
+                </div>
+            </div>
+            <button class="btn" onclick="loadStats()" style="margin-top: 10px;">
+                🔄 刷新统计
+            </button>
+        </div>
+        
+        <!-- 历史记录卡片 -->
+        <div class="card">
+            <h2>📜 历史记录</h2>
+            <div style="margin-bottom: 15px;">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="form-control" 
+                    placeholder="搜索关键词..."
+                    style="display: inline-block; width: 300px; margin-right: 10px;"
+                >
+                <button class="btn" onclick="searchHistory()" style="padding: 10px 20px;">
+                    🔍 搜索
+                </button>
+                <button class="btn" onclick="loadHistory()" style="padding: 10px 20px; margin-left: 10px;">
+                    🔄 刷新
+                </button>
+            </div>
+            
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>任务</th>
+                        <th>结果</th>
+                        <th>步数</th>
+                        <th>状态</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #999;">
+                            暂无历史记录
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '';
+        
+        // 显示消息
+        function showMessage(message, isError = false) {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `
+                <div class="alert ${isError ? 'alert-error' : 'alert-info'}">
+                    ${message}
+                </div>
+            `;
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 5000);
+        }
+        
+        // 执行任务
+        async function executeTask() {
+            const taskInput = document.getElementById('taskInput');
+            const task = taskInput.value.trim();
+            
+            if (!task) {
+                showMessage('请输入任务描述', true);
+                return;
+            }
+            
+            const executeBtn = document.getElementById('executeBtn');
+            executeBtn.disabled = true;
+            executeBtn.innerHTML = '<span class="loading"></span>执行中...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/run`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ task })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('resultContent').textContent = data.result;
+                    document.getElementById('resultArea').style.display = 'block';
+                    showMessage(`任务执行成功！步数：${data.steps}`);
+                    loadHistory();
+                    loadStats();
+                } else {
+                    showMessage(data.error || '任务执行失败', true);
+                }
+            } catch (error) {
+                showMessage(`请求失败：${error.message}`, true);
+            } finally {
+                executeBtn.disabled = false;
+                executeBtn.innerHTML = '执行任务';
+            }
+        }
+        
+        // 加载统计信息
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/history/stats`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.statistics;
+                    document.getElementById('totalTasks').textContent = stats.total_tasks;
+                    document.getElementById('successRate').textContent = 
+                        `${stats.success_rate.toFixed(1)}%`;
+                    document.getElementById('avgSteps').textContent = stats.average_steps;
+                    document.getElementById('avgDuration').textContent = 
+                        stats.average_duration_seconds.toFixed(1);
+                }
+            } catch (error) {
+                console.error('加载统计信息失败:', error);
+            }
+        }
+        
+        // 加载历史记录
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/history?limit=20`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderHistory(data.records);
+                }
+            } catch (error) {
+                console.error('加载历史记录失败:', error);
+            }
+        }
+        
+        // 搜索历史
+        async function searchHistory() {
+            const keyword = document.getElementById('searchInput').value.trim();
+            
+            if (!keyword) {
+                loadHistory();
+                return;
+            }
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE}/history/search?keyword=${encodeURIComponent(keyword)}`
+                );
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderHistory(data.records);
+                }
+            } catch (error) {
+                console.error('搜索失败:', error);
+            }
+        }
+        
+        // 渲染历史记录
+        function renderHistory(records) {
+            const tbody = document.getElementById('historyTableBody');
+            
+            if (!records || records.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #999;">
+                            暂无历史记录
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = records.map(record => `
+                <tr>
+                    <td>${record.id}</td>
+                    <td>${escapeHtml(record.task)}</td>
+                    <td>${escapeHtml(record.result)}</td>
+                    <td>${record.steps}</td>
+                    <td>
+                        <span class="status-badge ${record.success ? 'status-success' : 'status-failed'}">
+                            ${record.success ? '成功' : '失败'}
+                        </span>
+                    </td>
+                    <td>${formatTime(record.created_at)}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 格式化时间
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // 页面加载时初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadHistory();
+        });
+    </script>
+</body>
+</html>

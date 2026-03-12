@@ -2,12 +2,14 @@
 
 import argparse
 import json
+import logging
 import os
 from pathlib import Path
 
 import shutil
 import subprocess
 import sys
+from typing import Optional
 from urllib.parse import urlparse
 
 from openai import OpenAI
@@ -17,6 +19,10 @@ from phone_agent.agent import AgentConfig
 from phone_agent.config.apps import list_supported_apps
 from phone_agent.device_factory import DeviceType, get_device_factory, set_device_type
 from phone_agent.model import ModelConfig
+from phone_agent.utils.logger import setup_logger, LOG_LEVELS
+
+# 初始化 logger
+logger = setup_logger(__name__, level=logging.INFO)
 
 
 def check_system_requirements(
@@ -36,8 +42,8 @@ def check_system_requirements(
     Returns:
         如果所有检查通过返回 True，否则返回 False。
     """
-    print("🔍 Checking system requirements...")
-    print("-" * 50)
+    logger.info("Checking system requirements...")
+    logger.info("-" * 50)
 
     all_passed = True
 
@@ -46,11 +52,11 @@ def check_system_requirements(
     tool_cmd = "adb"
 
     # Check 1: Tool installed
-    print(f"1. Checking {tool_name} installation...", end=" ")
+    logger.info(f"1. Checking {tool_name} installation...")
     if shutil.which(tool_cmd) is None:
-        print("❌ FAILED")
-        print(f"   Error: {tool_name} is not installed or not in PATH.")
-        print(f"   Solution: Install {tool_name}:")
+        logger.critical("❌ FAILED")
+        logger.error(f"   Error: {tool_name} is not installed or not in PATH.")
+        logger.error(f"   Solution: Install {tool_name}:")
         if device_type == DeviceType.ADB:
             print("     - macOS: brew install android-platform-tools")
             print("     - Linux: sudo apt install android-tools-adb")
@@ -90,7 +96,7 @@ def check_system_requirements(
         return False
 
     # Check 2: Device connected
-    print("2. Checking connected devices...", end=" ")
+    logger.info("2. Checking connected devices...")
     try:
         if device_type == DeviceType.ADB:
             result = subprocess.run(
@@ -133,7 +139,7 @@ def check_system_requirements(
 
     # Check 3: ADB Keyboard installed
     if device_type == DeviceType.ADB:
-        print("3. Checking ADB Keyboard...", end=" ")
+        logger.info("3. Checking ADB Keyboard...")
         try:
             result = subprocess.run(
                 ["adb", "shell", "ime", "list", "-s"],
@@ -265,19 +271,19 @@ def load_config() -> dict:
     config_path = Path(__file__).parent / "config.json"
     
     if not config_path.exists():
-        print("⚠️  Config file not found, using default values")
+        logger.warning("Config file not found, using default values")
         return {}
     
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
-        print("✅ Loaded configuration from config.json")
+        logger.info("Loaded configuration from config.json")
         return config
     except json.JSONDecodeError as e:
-        print(f"⚠️  Error parsing config.json: {e}, using default values")
+        logger.error(f"Error parsing config.json: {e}, using default values")
         return {}
     except Exception as e:
-        print(f"⚠️  Error loading config: {e}, using default values")
+        logger.error(f"Error loading config: {e}, using default values")
         return {}
 
 

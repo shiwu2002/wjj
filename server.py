@@ -11,6 +11,7 @@ from flask_cors import CORS
 
 from phone_agent import PhoneAgent
 from phone_agent.agent import AgentConfig
+from phone_agent.history import get_history_manager
 from phone_agent.model import ModelConfig
 
 
@@ -43,6 +44,13 @@ def health_check():
         'status': 'healthy',
         'message': 'Server is running'
     })
+
+
+@app.route('/', methods=['GET'])
+def index():
+    """返回主页。"""
+    from flask import send_from_directory
+    return send_from_directory('templates', 'index.html')
 
 
 @app.route('/execute', methods=['POST'])
@@ -257,6 +265,83 @@ def update_config():
         }), 500
 
 
+@app.route('/history', methods=['GET'])
+def get_history():
+    """获取任务历史记录。"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        success_filter = request.args.get('success', type=str)
+        
+        history_mgr = get_history_manager()
+        
+        if success_filter == 'true':
+            records = history_mgr.get_successful_records(limit=limit)
+        elif success_filter == 'false':
+            records = history_mgr.get_failed_records(limit=limit)
+        else:
+            records = history_mgr.get_all_records(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(records),
+            'records': [record.to_dict() for record in records]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/history/stats', methods=['GET'])
+def get_history_stats():
+    """获取历史统计信息。"""
+    try:
+        history_mgr = get_history_manager()
+        stats = history_mgr.get_statistics()
+        
+        return jsonify({
+            'success': True,
+            'statistics': stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/history/search', methods=['GET'])
+def search_history():
+    """搜索历史记录。"""
+    try:
+        keyword = request.args.get('keyword', '')
+        limit = request.args.get('limit', 50, type=int)
+        
+        if not keyword:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameter: keyword'
+            }), 400
+        
+        history_mgr = get_history_manager()
+        records = history_mgr.search_records(keyword, limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'count': len(records),
+            'records': [record.to_dict() for record in records]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("Phone Agent HTTP Server")
@@ -268,6 +353,9 @@ if __name__ == '__main__':
     print("  POST /execute    - Advanced task execution (can override config)")
     print("  GET  /config     - Get current configuration")
     print("  POST /config     - Update configuration")
+    print("  GET  /history    - Get task history")
+    print("  GET  /history/stats - Get statistics")
+    print("  GET  /history/search - Search history")
     print("=" * 50)
     
     # 启动 Flask 服务器

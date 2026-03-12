@@ -1,16 +1,24 @@
 """用于编排手机自动化的主 PhoneAgent 类。"""
 
 import json
+import logging
+import time
 import traceback
 from dataclasses import dataclass
-from typing import Any, Callable
+from datetime import datetime
+from typing import Any, Callable, Optional
 
 from phone_agent.actions import ActionHandler
 from phone_agent.actions.handler import do, finish, parse_action
 from phone_agent.config import get_messages, get_system_prompt
 from phone_agent.device_factory import get_device_factory
+from phone_agent.history import get_history_manager
 from phone_agent.model import ModelClient, ModelConfig
 from phone_agent.model.client import MessageBuilder
+from phone_agent.utils.logger import setup_logger
+
+# 初始化 logger
+logger = setup_logger(__name__)
 
 
 @dataclass
@@ -93,11 +101,17 @@ class PhoneAgent:
         """
         self._context = []
         self._step_count = 0
+        
+        # 记录开始时间
+        start_time = datetime.now()
+        start_timestamp = time.time()
 
         # First step with user prompt
         result = self._execute_step(task, is_first=True)
 
         if result.finished:
+            end_time = datetime.now()
+            self._save_history(task, result, start_time, end_time)
             return result.message or "Task completed"
 
         # Continue until finished or max steps reached
@@ -105,8 +119,19 @@ class PhoneAgent:
             result = self._execute_step(is_first=False)
 
             if result.finished:
+                end_time = datetime.now()
+                self._save_history(task, result, start_time, end_time)
                 return result.message or "Task completed"
 
+        # Max steps reached
+        end_time = datetime.now()
+        self._save_history(
+            task, 
+            result, 
+            start_time, 
+            end_time,
+            error_message="Max steps reached"
+        )
         return "Max steps reached"
 
     def step(self, task: str | None = None) -> StepResult:
@@ -171,13 +196,12 @@ class PhoneAgent:
         # Get model response
         try:
             msgs = get_messages(self.agent_config.lang)
-            print("\n" + "=" * 50)
-            print(f"💭 {msgs['thinking']}:")
-            print("-" * 50)
+            logger.info("=" * 50)
+            logger.info(f"💭 {msgs['thinking']}:")
+            logger.info("-" * 50)
             response = self.model_client.request(self._context)
         except Exception as e:
-            if self.agent_config.verbose:
-                traceback.print_exc()
+            logger.error(f"Model request failed: {e}", exc_info=True)
             return StepResult(
                 success=False,
                 finished=True,
@@ -196,10 +220,10 @@ class PhoneAgent:
 
         if self.agent_config.verbose:
             # Print thinking process
-            print("-" * 50)
-            print(f"🎯 {msgs['action']}:")
-            print(json.dumps(action, ensure_ascii=False, indent=2))
-            print("=" * 50 + "\n")
+            logger.info("-" * 50)
+            logger.info(f"🎯 {msgs['action']}:")
+            logger.info(json.dumps(action, ensure_ascii=False, indent=2))
+            logger.info("=" * 50 + "\n")
 
         # Remove image from context to save space
         self._context[-1] = MessageBuilder.remove_images_from_message(self._context[-1])
@@ -210,8 +234,7 @@ class PhoneAgent:
                 action, screenshot.width, screenshot.height
             )
         except Exception as e:
-            if self.agent_config.verbose:
-                traceback.print_exc()
+            logger.error(f"Action execution failed: {e}", exc_info=True)
             result = self.action_handler.execute(
                 finish(message=str(e)), screenshot.width, screenshot.height
             )
@@ -228,11 +251,11 @@ class PhoneAgent:
 
         if finished and self.agent_config.verbose:
             msgs = get_messages(self.agent_config.lang)
-            print("\n" + "🎉 " + "=" * 48)
-            print(
+            logger.info("\n" + "🎉 " + "=" * 48)
+            logger.info(
                 f"✅ {msgs['task_completed']}: {result.message or action.get('message', msgs['done'])}"
             )
-            print("=" * 50 + "\n")
+            logger.info("=" * 50 + "\n")
 
         return StepResult(
             success=result.success,
@@ -251,3 +274,42 @@ class PhoneAgent:
     def step_count(self) -> int:
         """获取当前步数。"""
         return self._step_count
+    
+    def _save_history(
+        self,
+        task: str,
+        result: StepResult,
+        start_time: datetime,
+        end_time: datetime,
+        error_message: Optional[str] = None
+    ) -> None:
+        """
+        保存任务执行历史。
+        
+        Args:
+            task: 任务描述
+            result: 执行结果
+            start_time: 开始时间
+            end_time: 结束时间
+            error_message: 错误消息（可选）
+        """
+        try:
+            history_mgr = get_history_manager()
+            device_factory = get_device_factory()
+            devices = device_factory.list_devices()
+            device_id = devices[0].device_id if devices else None
+            
+            history_mgr.add_record(
+                task=task,
+                result=result.message or ("Success" if result.success else "Failed"),
+                steps=self._step_count,
+                success=result.success and not error_message,
+                start_time=start_time,
+                end_time=end_time,
+                device_id=device_id,
+                model_name=self.model_config.model_name,
+                error_message=error_message or (None if result.success else result.message)
+            )
+            logger.info(f"Task history saved: {task[:50]}...")
+        except Exception as e:
+            logger.error(f"Failed to save task history: {e}")
