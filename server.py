@@ -53,6 +53,108 @@ def index():
     return send_from_directory('templates', 'index.html')
 
 
+@app.route('/devices', methods=['GET'])
+def get_devices():
+    """获取已连接的设备列表。"""
+    try:
+        from phone_agent.device_factory import get_device_factory
+        device_factory = get_device_factory()
+        devices = device_factory.list_devices()
+        
+        return jsonify({
+            'success': True,
+            'count': len(devices),
+            'devices': [
+                {
+                    'device_id': d.device_id,
+                    'status': d.status,
+                    'connection_type': d.connection_type.value,
+                    'model': d.model or 'Unknown'
+                }
+                for d in devices
+            ]
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/devices/connect', methods=['POST'])
+def connect_device():
+    """连接到远程设备。"""
+    try:
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'error': 'Request must be JSON'
+            }), 400
+        
+        data = request.get_json()
+        address = data.get('address', '')
+        
+        if not address:
+            return jsonify({
+                'success': False,
+                'error': 'Missing device address'
+            }), 400
+        
+        from phone_agent.adb.connection import ADBConnection
+        conn = ADBConnection()
+        success, message = conn.connect(address)
+        
+        return jsonify({
+            'success': success,
+            'message': message
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/devices/disconnect', methods=['POST'])
+def disconnect_device():
+    """断开远程设备。"""
+    try:
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'error': 'Request must be JSON'
+            }), 400
+        
+        data = request.get_json()
+        address = data.get('address', 'all')
+        
+        from phone_agent.adb.connection import ADBConnection
+        conn = ADBConnection()
+        success, message = conn.disconnect(address if address != 'all' else None)
+        
+        return jsonify({
+            'success': success,
+            'message': message
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/devices/refresh', methods=['POST'])
+def refresh_devices():
+    """刷新设备列表。"""
+    try:
+        return get_devices()
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/execute', methods=['POST'])
 def execute_task():
     """
@@ -122,6 +224,17 @@ def execute_task():
             lang=agent_config_data.get('lang', 'cn'),
             verbose=bool(agent_config_data.get('verbose', True))
         )
+        
+        # 检查是否有可用设备
+        from phone_agent.device_factory import get_device_factory
+        device_factory = get_device_factory()
+        devices = device_factory.list_devices()
+        if not devices:
+            return jsonify({
+                'success': False,
+                'error': '没有可用的设备',
+                'message': '请先连接 ADB 设备（USB 或无线），刷新页面后重试'
+            }), 400
         
         # 创建并运行代理
         agent = PhoneAgent(
@@ -206,6 +319,17 @@ def run_simple():
             lang=agent_config_data.get('lang', 'cn'),
             verbose=bool(agent_config_data.get('verbose', True))
         )
+        
+        # 检查是否有可用设备
+        from phone_agent.device_factory import get_device_factory
+        device_factory = get_device_factory()
+        devices = device_factory.list_devices()
+        if not devices:
+            return jsonify({
+                'success': False,
+                'error': '没有可用的设备',
+                'message': '请先连接 ADB 设备（USB 或无线），刷新页面后重试'
+            }), 400
         
         # 创建并运行代理
         agent = PhoneAgent(
@@ -359,4 +483,4 @@ if __name__ == '__main__':
     print("=" * 50)
     
     # 启动 Flask 服务器
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5001, debug=False)

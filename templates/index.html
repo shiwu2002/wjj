@@ -227,8 +227,33 @@
         <div class="header">
             <h1>📱 PhoneAgent</h1>
             <p>AI 驱动的手机自动化代理系统</p>
+            <div id="deviceStatus" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.2); border-radius: 8px;">
+                <strong>🔌 设备状态：</strong> <span id="deviceCount">检测中...</span>
+                <button onclick="showDeviceManager()" style="margin-left: 10px; padding: 5px 15px; background: white; color: #667eea; border: none; border-radius: 5px; cursor: pointer;">📱 管理设备</button>
+            </div>
         </div>
         
+        <!-- 设备管理器模态框 -->
+        <div id="deviceModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+                <h2 style="color: #667eea; margin-bottom: 20px;">📱 设备管理</h2>
+                    
+                <div style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <input type="text" id="deviceAddress" placeholder="输入设备地址 (如：192.168.1.100:5555)" style="flex: 1; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px;">
+                        <button onclick="connectDevice()" class="btn" style="padding: 10px 20px;">连接</button>
+                    </div>
+                    <button onclick="refreshDevices()" class="btn" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: #333;">🔄 刷新设备列表</button>
+                </div>
+                    
+                <div id="deviceList" style="border: 1px solid #e0e0e0; border-radius: 6px; min-height: 200px;">
+                    <div style="padding: 40px; text-align: center; color: #999;">加载中...</div>
+                </div>
+                    
+                <button onclick="closeDeviceManager()" style="margin-top: 20px; width: 100%; padding: 12px; background: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer;">关闭</button>
+            </div>
+        </div>
+            
         <!-- 任务执行卡片 -->
         <div class="card">
             <h2>🚀 执行任务</h2>
@@ -490,6 +515,150 @@
         window.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadHistory();
+            updateDeviceStatus();
+            // 每 10 秒自动刷新设备状态
+            setInterval(updateDeviceStatus, 10000);
+        });
+        
+        // ========== 设备管理功能 ==========
+        
+        // 更新设备状态
+        async function updateDeviceStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/devices`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const count = data.count;
+                    document.getElementById('deviceCount').textContent = 
+                        count === 0 ? '未连接设备' : 
+                        `${count} 台设备已连接`;
+                    document.getElementById('deviceCount').style.color = 
+                        count === 0 ? '#ffcc80' : '#a5d6a7';
+                } else {
+                    document.getElementById('deviceCount').textContent = '获取失败';
+                }
+            } catch (error) {
+                console.error('获取设备状态失败:', error);
+                document.getElementById('deviceCount').textContent = '无法连接';
+            }
+        }
+        
+        // 显示设备管理器
+        function showDeviceManager() {
+            document.getElementById('deviceModal').style.display = 'block';
+            refreshDevices();
+        }
+        
+        // 关闭设备管理器
+        function closeDeviceManager() {
+            document.getElementById('deviceModal').style.display = 'none';
+        }
+        
+        // 刷新设备列表
+        async function refreshDevices() {
+            const deviceList = document.getElementById('deviceList');
+            deviceList.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">加载中...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/devices/refresh`);
+                const data = await response.json();
+                
+                if (data.success && data.devices && data.devices.length > 0) {
+                    deviceList.innerHTML = data.devices.map(device => `
+                        <div style="padding: 15px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: bold; color: #333;">${escapeHtml(device.device_id)}</div>
+                                <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                                    📊 ${device.status} | 🔌 ${device.connection_type} | 📱 ${device.model}
+                                </div>
+                            </div>
+                            ${device.connection_type === 'remote' || device.connection_type === 'wifi' ? `
+                                <button onclick="disconnectDevice('${device.device_id}')" style="padding: 8px 15px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">断开</button>
+                            ` : `
+                                <span style="color: #999; font-size: 12px;">USB 设备</span>
+                            `}
+                        </div>
+                    `).join('');
+                } else {
+                    deviceList.innerHTML = `
+                        <div style="padding: 40px; text-align: center; color: #999;">
+                            📱 暂无设备连接<br><br>
+                            <small>提示：可以通过 USB 连接设备，或使用 ADB 无线连接<br>
+                            有线连接后请刷新列表，或点击上方连接按钮添加远程设备</small>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('刷新设备列表失败:', error);
+                deviceList.innerHTML = '<div style="padding: 40px; text-align: center; color: #f44336;">加载失败，请重试</div>';
+            }
+        }
+        
+        // 连接设备
+        async function connectDevice() {
+            const addressInput = document.getElementById('deviceAddress');
+            const address = addressInput.value.trim();
+            
+            if (!address) {
+                alert('请输入设备地址');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/devices/connect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(`✅ ${data.message}`);
+                    addressInput.value = '';
+                    refreshDevices();
+                    updateDeviceStatus();
+                } else {
+                    showMessage(`❌ ${data.message}`, true);
+                }
+            } catch (error) {
+                showMessage(`连接失败：${error.message}`, true);
+            }
+        }
+        
+        // 断开设备
+        async function disconnectDevice(address) {
+            if (!confirm(`确定要断开设备 ${address} 吗？`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/devices/disconnect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(`✅ ${data.message}`);
+                    refreshDevices();
+                    updateDeviceStatus();
+                } else {
+                    showMessage(`❌ ${data.message}`, true);
+                }
+            } catch (error) {
+                showMessage(`断开失败：${error.message}`, true);
+            }
+        }
+        
+        // 点击模态框外部关闭
+        document.getElementById('deviceModal').addEventListener('click', (e) => {
+            if (e.target.id === 'deviceModal') {
+                closeDeviceManager();
+            }
         });
     </script>
 </body>
