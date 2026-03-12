@@ -452,7 +452,7 @@ def handle_device_commands(args) -> bool:
             print("Connected devices:")
             print("-" * 60)
             for device in devices:
-                status_icon = "✓" if device.status == "device" else "✗"
+                status_icon = "[OK]" if device.status == "device" else "[ERR]"
                 conn_type = device.connection_type.value
                 model_info = f" ({device.model})" if device.model else ""
                 print(
