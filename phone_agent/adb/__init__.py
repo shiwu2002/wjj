@@ -1,5 +1,11 @@
 """用于 Android 设备交互的 ADB 工具。"""
 
+from phone_agent.adb.cmd_executor import (
+    CommandExecutor,
+    enable_console_mode,
+    is_console_mode_enabled,
+    run_adb_command,
+)
 from phone_agent.adb.connection import (
     ADBConnection,
     ConnectionType,
@@ -26,6 +32,11 @@ from phone_agent.adb.input import (
 from phone_agent.adb.screenshot import get_screenshot
 
 __all__ = [
+    # Command Executor
+    "CommandExecutor",
+    "enable_console_mode",
+    "is_console_mode_enabled",
+    "run_adb_command",
     # Screenshot
     "get_screenshot",
     # Input

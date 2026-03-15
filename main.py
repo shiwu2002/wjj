@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 import shutil
-import subprocess
+from phone_agent.adb.cmd_executor import CommandExecutor, close_console
 import sys
 from typing import Optional
 from urllib.parse import urlparse
@@ -70,8 +70,8 @@ def check_system_requirements(
             if device_type == DeviceType.ADB:
                 version_cmd = [tool_cmd, "version"]
 
-            result = subprocess.run(
-                version_cmd, capture_output=True, text=True, timeout=10
+            result = CommandExecutor.run_silent(
+                version_cmd, timeout=10
             )
             if result.returncode == 0:
                 version_line = result.stdout.strip().split("\n")[0]
@@ -80,13 +80,9 @@ def check_system_requirements(
                 print("❌ FAILED")
                 print(f"   Error: {tool_name} command failed to run.")
                 all_passed = False
-        except FileNotFoundError:
+        except Exception as e:
             print("❌ FAILED")
             print(f"   Error: {tool_name} command not found.")
-            all_passed = False
-        except subprocess.TimeoutExpired:
-            print("❌ FAILED")
-            print(f"   Error: {tool_name} command timed out.")
             all_passed = False
 
     # If ADB is not installed, skip remaining checks
@@ -99,8 +95,8 @@ def check_system_requirements(
     logger.info("2. Checking connected devices...")
     try:
         if device_type == DeviceType.ADB:
-            result = subprocess.run(
-                ["adb", "devices"], capture_output=True, text=True, timeout=10
+            result = CommandExecutor.run_silent(
+                ["adb", "devices"], timeout=10
             )
             lines = result.stdout.strip().split("\n")
             # Filter out header and empty lines, look for 'device' status
@@ -122,10 +118,6 @@ def check_system_requirements(
             print(
                 f"✅ OK ({len(devices)} device(s): {', '.join(device_ids[:2])}{'...' if len(device_ids) > 2 else ''})"
             )
-    except subprocess.TimeoutExpired:
-        print("❌ FAILED")
-        print(f"   Error: {tool_name} command timed out.")
-        all_passed = False
     except Exception as e:
         print("❌ FAILED")
         print(f"   Error: {e}")
@@ -141,10 +133,8 @@ def check_system_requirements(
     if device_type == DeviceType.ADB:
         logger.info("3. Checking ADB Keyboard...")
         try:
-            result = subprocess.run(
+            result = CommandExecutor.run_silent(
                 ["adb", "shell", "ime", "list", "-s"],
-                capture_output=True,
-                text=True,
                 timeout=10,
             )
             ime_list = result.stdout.strip()
@@ -164,10 +154,6 @@ def check_system_requirements(
                     "     3. Enable it in Settings > System > Languages & Input > Virtual Keyboard"
                 )
                 all_passed = False
-        except subprocess.TimeoutExpired:
-            print("❌ FAILED")
-            print("   Error: ADB command timed out.")
-            all_passed = False
         except Exception as e:
             print("❌ FAILED")
             print(f"   Error: {e}")
@@ -607,6 +593,9 @@ def main():
                 break
             except Exception as e:
                 print(f"\nError: {e}\n")
+
+    # Close the console window
+    close_console()
 
 
 if __name__ == "__main__":

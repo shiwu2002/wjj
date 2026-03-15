@@ -11,6 +11,8 @@ from typing import Tuple
 
 from PIL import Image
 
+from phone_agent.adb.cmd_executor import CommandExecutor, is_console_mode_enabled
+
 
 @dataclass
 class Screenshot:
@@ -41,11 +43,9 @@ def get_screenshot(device_id: str | None = None, timeout: int = 10) -> Screensho
     adb_prefix = _get_adb_prefix(device_id)
 
     try:
-        # Execute screenshot command
-        result = subprocess.run(
+        # Execute screenshot command - 使用静默模式，因为需要获取输出
+        result = CommandExecutor.run_silent(
             adb_prefix + ["shell", "screencap", "-p", "/sdcard/tmp.png"],
-            capture_output=True,
-            text=True,
             timeout=timeout,
         )
 
@@ -54,11 +54,9 @@ def get_screenshot(device_id: str | None = None, timeout: int = 10) -> Screensho
         if "Status: -1" in output or "Failed" in output:
             return _create_fallback_screenshot(is_sensitive=True)
 
-        # Pull screenshot to local temp path
-        subprocess.run(
+        # Pull screenshot to local temp path - 使用静默模式
+        CommandExecutor.run_silent(
             adb_prefix + ["pull", "/sdcard/tmp.png", temp_path],
-            capture_output=True,
-            text=True,
             timeout=5,
         )
 

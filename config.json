@@ -1,7 +1,7 @@
 {
   "model": {
     "base_url": "https://api-inference.modelscope.cn/v1",
-    "model_name": "Qwen/Qwen3.5-35B-A3B",
+    "model_name": "ZhipuAI/AutoGLM-Phone-9B",
     "api_key": "ms-fd50204a-9b29-40e0-a29a-1af24569e10f"
   },
   "agent": {
@@ -14,5 +14,9 @@
     "type": "adb",
     "remote_address": null,
     "auto_connect": false
+  },
+  "command_window": {
+    "enabled": true,
+    "auto_close_delay": 1
   }
 }

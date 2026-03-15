@@ -2,7 +2,6 @@
 
 import ast
 import re
-import subprocess
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -258,21 +257,20 @@ class ActionHandler:
     def _send_keyevent(self, keycode: str) -> None:
         """向设备发送键值事件。"""
         from phone_agent.device_factory import DeviceType, get_device_factory
-        from phone_agent.hdc.connection import _run_hdc_command
+        from phone_agent.adb.cmd_executor import CommandExecutor
 
         device_factory = get_device_factory()
 
         # Handle HDC devices with HarmonyOS-specific keyEvent command
         if device_factory.device_type == DeviceType.HDC:
             hdc_prefix = ["hdc", "-t", self.device_id] if self.device_id else ["hdc"]
-            
+
             # Map common keycodes to HarmonyOS keyEvent codes
             # KEYCODE_ENTER (66) -> 2054 (HarmonyOS Enter key code)
             if keycode == "KEYCODE_ENTER" or keycode == "66":
-                _run_hdc_command(
+                CommandExecutor.run_silent(
                     hdc_prefix + ["shell", "uitest", "uiInput", "keyEvent", "2054"],
-                    capture_output=True,
-                    text=True,
+                    timeout=5,
                 )
             else:
                 # For other keys, try to use the numeric code directly
@@ -282,39 +280,32 @@ class ActionHandler:
                     if keycode.startswith("KEYCODE_"):
                         # For now, only handle ENTER, other keys may need mapping
                         if "ENTER" in keycode:
-                            _run_hdc_command(
+                            CommandExecutor.run_silent(
                                 hdc_prefix + ["shell", "uitest", "uiInput", "keyEvent", "2054"],
-                                capture_output=True,
-                                text=True,
+                                timeout=5,
                             )
                         else:
                             # Fallback to ADB-style command for unsupported keys
-                            subprocess.run(
-                                hdc_prefix + ["shell", "input", "keyevent", keycode],
-                                capture_output=True,
-                                text=True,
+                            CommandExecutor.run_in_console(
+                                hdc_prefix + ["shell", "input", "keyevent", keycode]
                             )
                     else:
                         # Assume it's a numeric code
-                        _run_hdc_command(
+                        CommandExecutor.run_silent(
                             hdc_prefix + ["shell", "uitest", "uiInput", "keyEvent", str(keycode)],
-                            capture_output=True,
-                            text=True,
+                            timeout=5,
                         )
                 except Exception:
                     # Fallback to ADB-style command
-                    subprocess.run(
-                        hdc_prefix + ["shell", "input", "keyevent", keycode],
-                        capture_output=True,
-                        text=True,
+                    CommandExecutor.run_in_console(
+                        hdc_prefix + ["shell", "input", "keyevent", keycode]
                     )
         else:
             # ADB devices use standard input keyevent command
             cmd_prefix = ["adb", "-s", self.device_id] if self.device_id else ["adb"]
-            subprocess.run(
-                cmd_prefix + ["shell", "input", "keyevent", keycode],
-                capture_output=True,
-                text=True,
+            # 在命令窗口中执行键值事件
+            CommandExecutor.run_in_console(
+                cmd_prefix + ["shell", "input", "keyevent", keycode]
             )
 
     @staticmethod

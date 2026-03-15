@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 
 from phone_agent.config.apps import APP_PACKAGES
 from phone_agent.config.timing import TIMING_CONFIG
+from phone_agent.adb.cmd_executor import CommandExecutor, is_console_mode_enabled
 
 
 def get_current_app(device_id: str | None = None) -> str:
@@ -21,8 +22,9 @@ def get_current_app(device_id: str | None = None) -> str:
     """
     adb_prefix = _get_adb_prefix(device_id)
 
-    result = subprocess.run(
-        adb_prefix + ["shell", "dumpsys", "window"], capture_output=True, text=True, encoding="utf-8"
+    # 此命令需要获取输出，使用静默模式
+    result = CommandExecutor.run_silent(
+        adb_prefix + ["shell", "dumpsys", "window"], timeout=10
     )
     output = result.stdout
     if not output:
@@ -55,8 +57,9 @@ def tap(
 
     adb_prefix = _get_adb_prefix(device_id)
 
-    subprocess.run(
-        adb_prefix + ["shell", "input", "tap", str(x), str(y)], capture_output=True
+    # 在命令窗口中执行点击命令
+    CommandExecutor.run_in_console(
+        adb_prefix + ["shell", "input", "tap", str(x), str(y)]
     )
     time.sleep(delay)
 
@@ -78,12 +81,13 @@ def double_tap(
 
     adb_prefix = _get_adb_prefix(device_id)
 
-    subprocess.run(
-        adb_prefix + ["shell", "input", "tap", str(x), str(y)], capture_output=True
+    # 在命令窗口中执行双击命令
+    CommandExecutor.run_in_console(
+        adb_prefix + ["shell", "input", "tap", str(x), str(y)]
     )
     time.sleep(TIMING_CONFIG.device.double_tap_interval)
-    subprocess.run(
-        adb_prefix + ["shell", "input", "tap", str(x), str(y)], capture_output=True
+    CommandExecutor.run_in_console(
+        adb_prefix + ["shell", "input", "tap", str(x), str(y)]
     )
     time.sleep(delay)
 
@@ -110,10 +114,10 @@ def long_press(
 
     adb_prefix = _get_adb_prefix(device_id)
 
-    subprocess.run(
+    # 在命令窗口中执行长按命令
+    CommandExecutor.run_in_console(
         adb_prefix
-        + ["shell", "input", "swipe", str(x), str(y), str(x), str(y), str(duration_ms)],
-        capture_output=True,
+        + ["shell", "input", "swipe", str(x), str(y), str(x), str(y), str(duration_ms)]
     )
     time.sleep(delay)
 
@@ -150,7 +154,8 @@ def swipe(
         duration_ms = int(dist_sq / 1000)
         duration_ms = max(1000, min(duration_ms, 2000))  # Clamp between 1000-2000ms
 
-    subprocess.run(
+    # 在命令窗口中执行滑动命令
+    CommandExecutor.run_in_console(
         adb_prefix
         + [
             "shell",
@@ -161,8 +166,7 @@ def swipe(
             str(end_x),
             str(end_y),
             str(duration_ms),
-        ],
-        capture_output=True,
+        ]
     )
     time.sleep(delay)
 
@@ -180,8 +184,9 @@ def back(device_id: str | None = None, delay: float | None = None) -> None:
 
     adb_prefix = _get_adb_prefix(device_id)
 
-    subprocess.run(
-        adb_prefix + ["shell", "input", "keyevent", "4"], capture_output=True
+    # 在命令窗口中执行返回命令
+    CommandExecutor.run_in_console(
+        adb_prefix + ["shell", "input", "keyevent", "4"]
     )
     time.sleep(delay)
 
@@ -199,8 +204,9 @@ def home(device_id: str | None = None, delay: float | None = None) -> None:
 
     adb_prefix = _get_adb_prefix(device_id)
 
-    subprocess.run(
-        adb_prefix + ["shell", "input", "keyevent", "KEYCODE_HOME"], capture_output=True
+    # 在命令窗口中执行主页命令
+    CommandExecutor.run_in_console(
+        adb_prefix + ["shell", "input", "keyevent", "KEYCODE_HOME"]
     )
     time.sleep(delay)
 
@@ -228,7 +234,8 @@ def launch_app(
     adb_prefix = _get_adb_prefix(device_id)
     package = APP_PACKAGES[app_name]
 
-    subprocess.run(
+    # 在命令窗口中执行启动命令
+    CommandExecutor.run_in_console(
         adb_prefix
         + [
             "shell",
@@ -238,8 +245,7 @@ def launch_app(
             "-c",
             "android.intent.category.LAUNCHER",
             "1",
-        ],
-        capture_output=True,
+        ]
     )
     time.sleep(delay)
     return True
