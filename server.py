@@ -418,6 +418,31 @@ def get_history():
         }), 500
 
 
+@app.route('/history/clear', methods=['POST'])
+def clear_history():
+    """清空所有历史记录。"""
+    try:
+        history_mgr = get_history_manager()
+        success = history_mgr.clear_all()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '所有历史记录已清空'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '清空历史记录失败'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/history/stats', methods=['GET'])
 def get_history_stats():
     """获取历史统计信息。"""

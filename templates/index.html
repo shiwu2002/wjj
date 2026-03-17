@@ -322,6 +322,9 @@
                 <button class="btn" onclick="loadHistory()" style="padding: 10px 20px; margin-left: 10px;">
                     🔄 刷新
                 </button>
+                <button class="btn" onclick="clearHistory()" style="padding: 10px 20px; margin-left: 10px; background: linear-gradient(135deg, #ff7b7b 0%, #ff4848 100%);">
+                    🗑️ 清除历史
+                </button>
             </div>
             
             <table class="history-table">
@@ -660,6 +663,34 @@
                 closeDeviceManager();
             }
         });
+
+        // 清除历史记录功能
+        async function clearHistory() {
+            if (!confirm('确定要清除所有历史记录吗？此操作不可撤销！')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/history/clear`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('✅ 历史记录已清除');
+                    loadHistory(); // 重新加载历史记录（显示为空）
+                    loadStats();    // 重新加载统计数据
+                } else {
+                    showMessage(`❌ 清除历史记录失败: ${data.error}`, true);
+                }
+            } catch (error) {
+                showMessage(`清除历史记录请求失败: ${error.message}`, true);
+            }
+        }
     </script>
 </body>
 </html>
