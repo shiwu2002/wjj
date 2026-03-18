@@ -5,13 +5,12 @@
 使用 SQLite 数据库进行持久化存储。
 """
 
-import json
+
 import logging
 import sqlite3
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +27,11 @@ class TaskRecord:
     start_time: datetime
     end_time: datetime
     duration_seconds: float
-    device_id: Optional[str]
-    model_name: Optional[str]
-    error_message: Optional[str] = None
+    device_id: str | None
+    model_name: str | None
+    error_message: str | None = None
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, int | str | bool | float | None]:
         """转换为字典格式。"""
         return {
             'id': self.id,
@@ -49,14 +48,14 @@ class TaskRecord:
         }
     
     @classmethod
-    def from_row(cls, row: tuple) -> 'TaskRecord':
+    def from_row(cls, row: tuple[int, str, str, int, int, str, str, float, str | None, str | None, str | None]) -> 'TaskRecord':
         """从数据库行创建实例。"""
         return cls(
             id=row[0],
             task=row[1],
             result=row[2],
             steps=row[3],
-            success=row[4],
+            success=bool(row[4]),
             start_time=datetime.fromisoformat(row[5]),
             end_time=datetime.fromisoformat(row[6]),
             duration_seconds=row[7],
@@ -73,7 +72,7 @@ class TaskHistoryManager:
     负责任务的增删改查操作。
     """
     
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         """
         初始化历史管理器。
         
@@ -130,9 +129,9 @@ class TaskHistoryManager:
         success: bool,
         start_time: datetime,
         end_time: datetime,
-        device_id: Optional[str] = None,
-        model_name: Optional[str] = None,
-        error_message: Optional[str] = None
+        device_id: str | None = None,
+        model_name: str | None = None,
+        error_message: str | None = None
     ) -> int:
         """
         添加任务记录。
@@ -172,9 +171,9 @@ class TaskHistoryManager:
         conn.close()
         
         logger.info(f"Added task record #{record_id}: {task[:50]}...")
-        return record_id
+        return record_id if record_id is not None else 0
     
-    def get_record(self, record_id: int) -> Optional[TaskRecord]:
+    def get_record(self, record_id: int) -> TaskRecord | None:
         """
         获取单条记录。
         
@@ -198,7 +197,7 @@ class TaskHistoryManager:
             return TaskRecord.from_row(row)
         return None
     
-    def get_all_records(self, limit: int = 100) -> List[TaskRecord]:
+    def get_all_records(self, limit: int = 100) -> list[TaskRecord]:
         """
         获取所有记录（默认最多 100 条）。
         
@@ -222,7 +221,7 @@ class TaskHistoryManager:
         
         return [TaskRecord.from_row(row) for row in rows]
     
-    def get_successful_records(self, limit: int = 50) -> List[TaskRecord]:
+    def get_successful_records(self, limit: int = 50) -> list[TaskRecord]:
         """
         获取成功的任务记录。
         
@@ -247,7 +246,7 @@ class TaskHistoryManager:
         
         return [TaskRecord.from_row(row) for row in rows]
     
-    def get_failed_records(self, limit: int = 50) -> List[TaskRecord]:
+    def get_failed_records(self, limit: int = 50) -> list[TaskRecord]:
         """
         获取失败的任务记录。
         
@@ -272,7 +271,7 @@ class TaskHistoryManager:
         
         return [TaskRecord.from_row(row) for row in rows]
     
-    def search_records(self, keyword: str, limit: int = 50) -> List[TaskRecord]:
+    def search_records(self, keyword: str, limit: int = 50) -> list[TaskRecord]:
         """
         搜索包含关键词的任务记录。
         
@@ -298,7 +297,7 @@ class TaskHistoryManager:
         
         return [TaskRecord.from_row(row) for row in rows]
     
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, int | float]:
         """
         获取统计信息。
         
@@ -384,10 +383,10 @@ class TaskHistoryManager:
 
 
 # 全局单例
-_history_manager: Optional[TaskHistoryManager] = None
+_history_manager: TaskHistoryManager | None = None
 
 
-def get_history_manager(db_path: Optional[str] = None) -> TaskHistoryManager:
+def get_history_manager(db_path: str | None = None) -> TaskHistoryManager:
     """
     获取全局历史管理器实例。
     

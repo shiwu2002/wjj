@@ -30,7 +30,7 @@ class ConsoleWindow:
         if self._initialized:
             return
         self._initialized = True
-        self._process: Optional[subprocess.Popen] = None
+        self._process: Optional['subprocess.Popen[str]'] = None
         self._pipe = None
         self._window_title = "ADB Command Console"
 
@@ -125,8 +125,9 @@ timeout /t 2 /nobreak >nul
         try:
             cmd_str = ' '.join(cmd)
             # 写入命令到进程的标准输入
-            self._process.stdin.write(cmd_str + '\n')
-            self._process.stdin.flush()
+            if self._process and self._process.stdin:
+                self._process.stdin.write(cmd_str + '\n')
+                self._process.stdin.flush()
             return True
         except Exception as e:
             print(f"Failed to execute command in console: {e}")
@@ -139,8 +140,9 @@ timeout /t 2 /nobreak >nul
         """关闭持久命令窗口。"""
         if self._process is not None:
             try:
-                self._process.stdin.write('__EXIT__\n')
-                self._process.stdin.flush()
+                if self._process.stdin:
+                    self._process.stdin.write('__EXIT__\n')
+                    self._process.stdin.flush()
                 self._process.wait(timeout=3)
             except Exception:
                 try:
@@ -174,7 +176,7 @@ class CommandExecutor:
         cmd: list[str],
         console: bool = True,
         auto_close_delay: int = 1
-    ) -> subprocess.CompletedProcess:
+    ) -> 'subprocess.CompletedProcess[str]':
         """
         在命令窗口中执行命令。
 
@@ -195,7 +197,7 @@ class CommandExecutor:
             return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
 
     @staticmethod
-    def run_silent(cmd: list[str], timeout: Optional[int] = None) -> subprocess.CompletedProcess:
+    def run_silent(cmd: list[str], timeout: Optional[int] = None) -> 'subprocess.CompletedProcess[str]':
         """
         在后台静默执行命令（不显示窗口）。
 
@@ -215,7 +217,7 @@ class CommandExecutor:
         )
 
     @staticmethod
-    def run_visible(cmd: list[str], timeout: Optional[int] = None) -> subprocess.CompletedProcess:
+    def run_visible(cmd: list[str], timeout: Optional[int] = None) -> 'subprocess.CompletedProcess[str]':
         """
         在当前可见的终端窗口中执行命令（不创建新窗口）。
 
@@ -235,7 +237,7 @@ class CommandExecutor:
         )
 
 
-def _run_in_persistent_console(cmd: list[str]) -> subprocess.CompletedProcess:
+def _run_in_persistent_console(cmd: list[str]) -> 'subprocess.CompletedProcess[str]':
     """
     在持久的 Windows 命令窗口中执行命令。
 
@@ -310,7 +312,7 @@ def run_adb_command(
     args: list[str],
     device_id: Optional[str] = None,
     console: bool = True
-) -> subprocess.CompletedProcess:
+) -> 'subprocess.CompletedProcess[str]':
     """
     运行 ADB 命令的便捷函数。
 

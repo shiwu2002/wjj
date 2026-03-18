@@ -7,11 +7,10 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Tuple
 
 from PIL import Image
 
-from phone_agent.adb.cmd_executor import CommandExecutor, is_console_mode_enabled
+from phone_agent.utils.resolution import ResolutionConverter, CoordinateMapper
 
 
 @dataclass
@@ -22,9 +21,14 @@ class Screenshot:
     width: int
     height: int
     is_sensitive: bool = False
+    # 分辨率转换相关
+    converter: ResolutionConverter | None = None
+    mapper: CoordinateMapper | None = None
+    original_width: int | None = None
+    original_height: int | None = None
 
 
-def get_screenshot(device_id: str | None = None, timeout: int = 10) -> Screenshot:
+def get_screenshot(device_id: str | None = None, timeout: int = 10, enable_compression: bool = True) -> Screenshot:
     """
     从已连接的 Android 设备捕获截图。
 
@@ -43,9 +47,11 @@ def get_screenshot(device_id: str | None = None, timeout: int = 10) -> Screensho
     adb_prefix = _get_adb_prefix(device_id)
 
     try:
-        # Execute screenshot command - 使用静默模式，因为需要获取输出
-        result = CommandExecutor.run_silent(
+        # Execute screenshot command
+        result = subprocess.run(
             adb_prefix + ["shell", "screencap", "-p", "/sdcard/tmp.png"],
+            capture_output=True,
+            text=True,
             timeout=timeout,
         )
 
@@ -54,17 +60,30 @@ def get_screenshot(device_id: str | None = None, timeout: int = 10) -> Screensho
         if "Status: -1" in output or "Failed" in output:
             return _create_fallback_screenshot(is_sensitive=True)
 
-        # Pull screenshot to local temp path - 使用静默模式
-        CommandExecutor.run_silent(
+        # Pull screenshot to local temp path
+        subprocess.run(
             adb_prefix + ["pull", "/sdcard/tmp.png", temp_path],
+            capture_output=True,
+            text=True,
             timeout=5,
         )
 
         if not os.path.exists(temp_path):
             return _create_fallback_screenshot(is_sensitive=False)
 
-        # Read and encode image
+        # Read and process image
         img = Image.open(temp_path)
+        original_width, original_height = img.size
+
+        # Compress image if enabled
+        converter = None
+        mapper = None
+        if enable_compression:
+            converter = ResolutionConverter()
+            img = converter.compress_to_1k(img)
+            # 创建坐标映射器
+            mapper = CoordinateMapper.from_converter(converter)
+
         width, height = img.size
 
         buffered = BytesIO()
@@ -75,7 +94,14 @@ def get_screenshot(device_id: str | None = None, timeout: int = 10) -> Screensho
         os.remove(temp_path)
 
         return Screenshot(
-            base64_data=base64_data, width=width, height=height, is_sensitive=False
+            base64_data=base64_data,
+            width=width,
+            height=height,
+            is_sensitive=False,
+            converter=converter,
+            mapper=mapper,
+            original_width=original_width,
+            original_height=original_height
         )
 
     except Exception as e:
@@ -83,7 +109,7 @@ def get_screenshot(device_id: str | None = None, timeout: int = 10) -> Screensho
         return _create_fallback_screenshot(is_sensitive=False)
 
 
-def _get_adb_prefix(device_id: str | None) -> list:
+def _get_adb_prefix(device_id: str | None) -> list[str]:
     """获取带有可选设备指定的 ADB 命令前缀。"""
     if device_id:
         return ["adb", "-s", device_id]
@@ -104,4 +130,7 @@ def _create_fallback_screenshot(is_sensitive: bool) -> Screenshot:
         width=default_width,
         height=default_height,
         is_sensitive=is_sensitive,
+        converter=None,
+        original_width=None,
+        original_height=None
     )

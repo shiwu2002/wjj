@@ -1,16 +1,16 @@
 """用于编排手机自动化的主 PhoneAgent 类。"""
 
 import json
-import logging
-import time
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any
 
 from phone_agent.actions import ActionHandler
-from phone_agent.actions.handler import do, finish, parse_action
-from phone_agent.config import get_messages, get_system_prompt
+from phone_agent.actions.handler import finish, parse_action
+from phone_agent.config import get_system_prompt
+from phone_agent.config.i18n import get_messages
 from phone_agent.device_factory import get_device_factory
 from phone_agent.history import get_history_manager
 from phone_agent.model import ModelClient, ModelConfig
@@ -104,7 +104,6 @@ class PhoneAgent:
         
         # 记录开始时间
         start_time = datetime.now()
-        start_timestamp = time.time()
 
         # First step with user prompt
         result = self._execute_step(task, is_first=True)
@@ -171,11 +170,13 @@ class PhoneAgent:
 
         # Build messages
         if is_first:
+            # system_prompt 在 __post_init__ 中已确保不为 None
+            assert self.agent_config.system_prompt is not None
             self._context.append(
                 MessageBuilder.create_system_message(self.agent_config.system_prompt)
             )
 
-            screen_info = MessageBuilder.build_screen_info(current_app)
+            screen_info = MessageBuilder.build_screen_info(current_app)  # type: ignore[misc]
             text_content = f"{user_prompt}\n\n{screen_info}"
 
             self._context.append(
@@ -184,7 +185,7 @@ class PhoneAgent:
                 )
             )
         else:
-            screen_info = MessageBuilder.build_screen_info(current_app)
+            screen_info = MessageBuilder.build_screen_info(current_app)  # type: ignore[misc]
             text_content = f"** Screen Info **\n\n{screen_info}"
 
             self._context.append(
@@ -231,12 +232,12 @@ class PhoneAgent:
         # Execute action
         try:
             result = self.action_handler.execute(
-                action, screenshot.width, screenshot.height
+                action, screenshot
             )
         except Exception as e:
-            logger.error(f"Action execution failed: {e}", exc_info=True)
+            logger.error(f"Action request failed: {e}", exc_info=True)
             result = self.action_handler.execute(
-                finish(message=str(e)), screenshot.width, screenshot.height
+                finish(message=str(e)), screenshot
             )
 
         # Add assistant response to context
@@ -281,7 +282,7 @@ class PhoneAgent:
         result: StepResult,
         start_time: datetime,
         end_time: datetime,
-        error_message: Optional[str] = None
+        error_message: str | None = None
     ) -> None:
         """
         保存任务执行历史。

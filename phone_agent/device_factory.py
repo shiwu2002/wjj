@@ -1,7 +1,7 @@
 """用于根据设备类型选择 ADB的设备工厂。"""
 
 from enum import Enum
-from typing import Any
+
 
 
 class DeviceType(Enum):

@@ -1,11 +1,11 @@
 """用于处理 AI 模型输出的动作处理器。"""
 
 import ast
-import re
 import time
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
+from phone_agent.adb.screenshot import Screenshot
 from phone_agent.config.timing import TIMING_CONFIG
 from phone_agent.device_factory import get_device_factory
 
@@ -18,6 +18,10 @@ class ActionResult:
     should_finish: bool
     message: str | None = None
     requires_confirmation: bool = False
+
+
+ActionHandlerFunc = Callable[[dict[str, Any], Screenshot], ActionResult]
+# 用于处理动作的可调用对象类型
 
 
 class ActionHandler:
@@ -33,27 +37,25 @@ class ActionHandler:
 
     def __init__(
         self,
-        device_id: str | None = None,
-        confirmation_callback: Callable[[str], bool] | None = None,
-        takeover_callback: Callable[[str], None] | None = None,
+        device_id: Optional[str] = None,
+        confirmation_callback: Optional[Callable[[str], bool]] = None,
+        takeover_callback: Optional[Callable[[str], None]] = None,
     ):
         self.device_id = device_id
         self.confirmation_callback = confirmation_callback or self._default_confirmation
         self.takeover_callback = takeover_callback or self._default_takeover
 
     def execute(
-        self, action: dict[str, Any], screen_width: int, screen_height: int
+        self, action: dict[str, Any], screenshot: Screenshot
     ) -> ActionResult:
-        """
-        执行来自 AI 模型的动作。
+        """执行来自 AI 模型的动作。
 
         Args:
-            action: 来自模型的动作字典。
-            screen_width: 当前屏幕宽度（像素）。
-            screen_height: 当前屏幕高度（像素）。
+            action: 来自模型的动作字典
+            screenshot: Screenshot 对象，包含屏幕尺寸和坐标映射器
 
         Returns:
-            指示成功和是否结束的 ActionResult。
+            ActionResult: 动作执行结果，包含成功状态和是否结束
         """
         action_type = action.get("_metadata")
 
@@ -70,6 +72,13 @@ class ActionHandler:
             )
 
         action_name = action.get("action")
+        if action_name is None:
+            return ActionResult(
+                success=False,
+                should_finish=False,
+                message="No action specified in the command",
+            )
+
         handler_method = self._get_handler(action_name)
 
         if handler_method is None:
@@ -80,15 +89,15 @@ class ActionHandler:
             )
 
         try:
-            return handler_method(action, screen_width, screen_height)
+            return handler_method(action, screenshot)
         except Exception as e:
             return ActionResult(
                 success=False, should_finish=False, message=f"Action failed: {e}"
             )
 
-    def _get_handler(self, action_name: str) -> Callable | None:
+    def _get_handler(self, action_name: str) -> ActionHandlerFunc | None:
         """获取动作的处理方法。"""
-        handlers = {
+        handlers: dict[str, ActionHandlerFunc] = {
             "Launch": self._handle_launch,
             "Tap": self._handle_tap,
             "Type": self._handle_type,
@@ -107,14 +116,23 @@ class ActionHandler:
         return handlers.get(action_name)
 
     def _convert_relative_to_absolute(
-        self, element: list[int], screen_width: int, screen_height: int
+        self, element: list[int], screenshot: Screenshot
     ) -> tuple[int, int]:
         """将相对坐标 (0-1000) 转换为绝对像素。"""
-        x = int(element[0] / 1000 * screen_width)
-        y = int(element[1] / 1000 * screen_height)
-        return x, y
+        # 如果存在 mapper，说明图片被压缩了，需要将 1K 坐标转换回原始分辨率
+        if screenshot.mapper is not None:
+            # 先将相对坐标转换为 1K 分辨率的绝对坐标
+            x_1k = int(element[0] / 1000 * screenshot.width)
+            y_1k = int(element[1] / 1000 * screenshot.height)
+            # 再通过 mapper 转换回原始分辨率
+            return screenshot.mapper.to_original_coordinate(x_1k, y_1k)
+        else:
+            # 没有压缩，直接转换
+            x = int(element[0] / 1000 * screenshot.width)
+            y = int(element[1] / 1000 * screenshot.height)
+            return x, y
 
-    def _handle_launch(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_launch(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理启动应用动作。"""
         app_name = action.get("app")
         if not app_name:
@@ -126,13 +144,13 @@ class ActionHandler:
             return ActionResult(True, False)
         return ActionResult(False, False, f"App not found: {app_name}")
 
-    def _handle_tap(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_tap(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理点击动作。"""
         element = action.get("element")
         if not element:
             return ActionResult(False, False, "No element coordinates")
 
-        x, y = self._convert_relative_to_absolute(element, width, height)
+        x, y = self._convert_relative_to_absolute(element, screenshot)
 
         # Check for sensitive operation
         if "message" in action:
@@ -147,7 +165,7 @@ class ActionHandler:
         device_factory.tap(x, y, self.device_id)
         return ActionResult(True, False)
 
-    def _handle_type(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_type(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理文本输入动作。"""
         text = action.get("text", "")
 
@@ -171,7 +189,7 @@ class ActionHandler:
 
         return ActionResult(True, False)
 
-    def _handle_swipe(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_swipe(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理滑动动作。"""
         start = action.get("start")
         end = action.get("end")
@@ -179,48 +197,48 @@ class ActionHandler:
         if not start or not end:
             return ActionResult(False, False, "Missing swipe coordinates")
 
-        start_x, start_y = self._convert_relative_to_absolute(start, width, height)
-        end_x, end_y = self._convert_relative_to_absolute(end, width, height)
+        start_x, start_y = self._convert_relative_to_absolute(start, screenshot)
+        end_x, end_y = self._convert_relative_to_absolute(end, screenshot)
 
         device_factory = get_device_factory()
         device_factory.swipe(start_x, start_y, end_x, end_y, device_id=self.device_id)
         return ActionResult(True, False)
 
-    def _handle_back(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_back(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理返回按钮动作。"""
         device_factory = get_device_factory()
         device_factory.back(self.device_id)
         return ActionResult(True, False)
 
-    def _handle_home(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_home(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理主页按钮动作。"""
         device_factory = get_device_factory()
         device_factory.home(self.device_id)
         return ActionResult(True, False)
 
-    def _handle_double_tap(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_double_tap(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理双击动作。"""
         element = action.get("element")
         if not element:
             return ActionResult(False, False, "No element coordinates")
 
-        x, y = self._convert_relative_to_absolute(element, width, height)
+        x, y = self._convert_relative_to_absolute(element, screenshot)
         device_factory = get_device_factory()
         device_factory.double_tap(x, y, self.device_id)
         return ActionResult(True, False)
 
-    def _handle_long_press(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_long_press(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理长按动作。"""
         element = action.get("element")
         if not element:
             return ActionResult(False, False, "No element coordinates")
 
-        x, y = self._convert_relative_to_absolute(element, width, height)
+        x, y = self._convert_relative_to_absolute(element, screenshot)
         device_factory = get_device_factory()
         device_factory.long_press(x, y, device_id=self.device_id)
         return ActionResult(True, False)
 
-    def _handle_wait(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_wait(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理等待动作。"""
         duration_str = action.get("duration", "1 seconds")
         try:
@@ -231,82 +249,39 @@ class ActionHandler:
         time.sleep(duration)
         return ActionResult(True, False)
 
-    def _handle_takeover(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_takeover(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理接管请求（登录、验证码等）。"""
         message = action.get("message", "User intervention required")
         self.takeover_callback(message)
         return ActionResult(True, False)
 
-    def _handle_note(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_note(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理笔记动作（用于内容记录的占位符）。"""
         # This action is typically used for recording page content
         # Implementation depends on specific requirements
         return ActionResult(True, False)
 
-    def _handle_call_api(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_call_api(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理 API 调用动作（用于总结的占位符）。"""
         # This action is typically used for content summarization
         # Implementation depends on specific requirements
         return ActionResult(True, False)
 
-    def _handle_interact(self, action: dict, width: int, height: int) -> ActionResult:
+    def _handle_interact(self, action: dict[str, Any], screenshot: Screenshot) -> ActionResult:
         """处理交互请求（需要用户选择）。"""
         # This action signals that user input is needed
         return ActionResult(True, False, message="User interaction required")
 
     def _send_keyevent(self, keycode: str) -> None:
         """向设备发送键值事件。"""
-        from phone_agent.device_factory import DeviceType, get_device_factory
         from phone_agent.adb.cmd_executor import CommandExecutor
 
-        device_factory = get_device_factory()
-
-        # Handle HDC devices with HarmonyOS-specific keyEvent command
-        if device_factory.device_type == DeviceType.HDC:
-            hdc_prefix = ["hdc", "-t", self.device_id] if self.device_id else ["hdc"]
-
-            # Map common keycodes to HarmonyOS keyEvent codes
-            # KEYCODE_ENTER (66) -> 2054 (HarmonyOS Enter key code)
-            if keycode == "KEYCODE_ENTER" or keycode == "66":
-                CommandExecutor.run_silent(
-                    hdc_prefix + ["shell", "uitest", "uiInput", "keyEvent", "2054"],
-                    timeout=5,
-                )
-            else:
-                # For other keys, try to use the numeric code directly
-                # If keycode is a string like "KEYCODE_ENTER", convert it
-                try:
-                    # Try to extract numeric code from string or use as-is
-                    if keycode.startswith("KEYCODE_"):
-                        # For now, only handle ENTER, other keys may need mapping
-                        if "ENTER" in keycode:
-                            CommandExecutor.run_silent(
-                                hdc_prefix + ["shell", "uitest", "uiInput", "keyEvent", "2054"],
-                                timeout=5,
-                            )
-                        else:
-                            # Fallback to ADB-style command for unsupported keys
-                            CommandExecutor.run_in_console(
-                                hdc_prefix + ["shell", "input", "keyevent", keycode]
-                            )
-                    else:
-                        # Assume it's a numeric code
-                        CommandExecutor.run_silent(
-                            hdc_prefix + ["shell", "uitest", "uiInput", "keyEvent", str(keycode)],
-                            timeout=5,
-                        )
-                except Exception:
-                    # Fallback to ADB-style command
-                    CommandExecutor.run_in_console(
-                        hdc_prefix + ["shell", "input", "keyevent", keycode]
-                    )
-        else:
-            # ADB devices use standard input keyevent command
-            cmd_prefix = ["adb", "-s", self.device_id] if self.device_id else ["adb"]
-            # 在命令窗口中执行键值事件
-            CommandExecutor.run_in_console(
-                cmd_prefix + ["shell", "input", "keyevent", keycode]
-            )
+        # ADB devices use standard input keyevent command
+        cmd_prefix = ["adb", "-s", self.device_id] if self.device_id else ["adb"]
+        # 在命令窗口中执行键值事件
+        CommandExecutor.run_in_console(
+            cmd_prefix + ["shell", "input", "keyevent", keycode]
+        )
 
     @staticmethod
     def _default_confirmation(message: str) -> bool:
@@ -359,6 +334,8 @@ def parse_action(response: str) -> dict[str, Any]:
                 action = {"_metadata": "do"}
                 for keyword in call.keywords:
                     key = keyword.arg
+                    if key is None:
+                        raise ValueError("Unnamed keyword argument in action")
                     value = ast.literal_eval(keyword.value)
                     action[key] = value
 
@@ -378,13 +355,13 @@ def parse_action(response: str) -> dict[str, Any]:
         raise ValueError(f"Failed to parse action: {e}")
 
 
-def do(**kwargs) -> dict[str, Any]:
+def do(**kwargs: Any) -> dict[str, Any]:
     """用于创建 'do' 动作的辅助函数。"""
     kwargs["_metadata"] = "do"
     return kwargs
 
 
-def finish(**kwargs) -> dict[str, Any]:
+def finish(**kwargs: Any) -> dict[str, Any]:
     """用于创建 'finish' 动作的辅助函数。"""
     kwargs["_metadata"] = "finish"
     return kwargs

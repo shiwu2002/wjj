@@ -4,9 +4,10 @@ import json
 import time
 import httpx
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Dict
 
-from openai import OpenAI
+from openai import OpenAI, Stream
+from openai.types.chat import ChatCompletionChunk
 
 from phone_agent.config.i18n import get_message
 
@@ -22,7 +23,7 @@ class ModelConfig:
     temperature: float = 0.0
     top_p: float = 0.85
     frequency_penalty: float = 0.2
-    extra_body: dict[str, Any] = field(default_factory=dict)
+    extra_body: Dict[str, Any] = field(default_factory=dict)
     lang: str = "cn"  # Language for UI messages: 'cn' or 'en'
 
 
@@ -77,14 +78,14 @@ class ModelClient:
         time_to_first_token = None
         time_to_thinking_end = None
 
-        stream = self.client.chat.completions.create(
-            messages=messages,
+        stream: Stream[ChatCompletionChunk] = self.client.chat.completions.create(  # type: ignore[arg-type]
+            messages=messages,  # type: ignore[arg-type]
             model=self.config.model_name,
             max_tokens=self.config.max_tokens,
             temperature=self.config.temperature,
             top_p=self.config.top_p,
             frequency_penalty=self.config.frequency_penalty,
-            extra_body=self.config.extra_body,
+            extra_body=self.config.extra_body,  # type: ignore[arg-type]
             stream=True,
         )
 
@@ -94,11 +95,11 @@ class ModelClient:
         in_action_phase = False  # Track if we've entered the action phase
         first_token_received = False
 
-        for chunk in stream:
-            if len(chunk.choices) == 0:
+        for chunk in stream:  # type: ignore[attr-defined]
+            if len(chunk.choices) == 0:  # type: ignore[arg-type]
                 continue
-            if chunk.choices[0].delta.content is not None:
-                content = chunk.choices[0].delta.content
+            if chunk.choices[0].delta.content is not None:  # type: ignore[union-attr]
+                content: str = chunk.choices[0].delta.content  # type: ignore[union-attr]
                 raw_content += content
 
                 # Record time to first token
@@ -117,7 +118,8 @@ class ModelClient:
                 for marker in action_markers:
                     if marker in buffer:
                         # Marker found, print everything before it
-                        thinking_part = buffer.split(marker, 1)[0]
+                        marker_str: str = marker
+                        thinking_part: str = buffer.split(marker_str, 1)[0]
                         print(thinking_part, end="", flush=True)
                         print()  # Print newline after thinking is complete
                         in_action_phase = True
@@ -319,7 +321,7 @@ class MessageBuilder:
         return message
 
     @staticmethod
-    def build_screen_info(current_app: str, **extra_info) -> str:
+    def build_screen_info(current_app: str, **extra_info) -> str:  # type: ignore[no-untyped-def]
         """
         为模型构建屏幕信息字符串。
 

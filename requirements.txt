@@ -1,9 +1,6 @@
 Pillow>=12.0.0
 openai>=2.9.0
 
-# For iOS Support
-requests>=2.31.0
-
 # For HTTP Server
 flask>=3.0.0
 flask-cors>=4.0.0

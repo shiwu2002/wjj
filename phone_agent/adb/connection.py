@@ -4,10 +4,9 @@ import subprocess
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 from phone_agent.config.timing import TIMING_CONFIG
-from phone_agent.adb.cmd_executor import CommandExecutor, is_console_mode_enabled
+from subprocess import CompletedProcess
 
 
 class ConnectionType(Enum):
@@ -74,9 +73,11 @@ class ADBConnection:
             address = f"{address}:5555"  # Default ADB port
 
         try:
-            # 连接命令使用静默模式，因为需要获取输出
-            result = CommandExecutor.run_silent(
-                [self.adb_path, "connect", address], timeout=timeout
+            result: CompletedProcess[str] = subprocess.run(
+                [self.adb_path, "connect", address],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
             )
 
             output = result.stdout + result.stderr
@@ -108,8 +109,7 @@ class ADBConnection:
             if address:
                 cmd.append(address)
 
-            # 断开连接命令使用静默模式
-            result = CommandExecutor.run_silent(cmd, timeout=5)
+            result: CompletedProcess[str] = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=5)
 
             output = result.stdout + result.stderr
             return True, output.strip() or "Disconnected"
@@ -125,12 +125,14 @@ class ADBConnection:
             DeviceInfo 对象列表。
         """
         try:
-            # 列出设备命令使用静默模式，因为需要获取输出
-            result = CommandExecutor.run_silent(
-                [self.adb_path, "devices", "-l"], timeout=5
+            result: CompletedProcess[str] = subprocess.run(
+                [self.adb_path, "devices", "-l"],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
 
-            devices = []
+            devices: list[DeviceInfo] = []
             for line in result.stdout.strip().split("\n")[1:]:  # Skip header
                 if not line.strip():
                     continue
@@ -239,8 +241,7 @@ class ADBConnection:
                 cmd.extend(["-s", device_id])
             cmd.extend(["tcpip", str(port)])
 
-            # 启用 TCP/IP 命令使用静默模式
-            result = CommandExecutor.run_silent(cmd, timeout=10)
+            result: CompletedProcess[str] = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=10)
 
             output = result.stdout + result.stderr
 
@@ -269,8 +270,7 @@ class ADBConnection:
                 cmd.extend(["-s", device_id])
             cmd.extend(["shell", "ip", "route"])
 
-            # 获取设备 IP 命令使用静默模式
-            result = CommandExecutor.run_silent(cmd, timeout=5)
+            result: CompletedProcess[str] = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=5)
 
             # Parse IP from route output
             for line in result.stdout.split("\n"):
@@ -281,9 +281,11 @@ class ADBConnection:
                             return parts[i + 1]
 
             # Alternative: try wlan0 interface
-            cmd[-1] = "ip addr show wlan0"
-            result = CommandExecutor.run_silent(
+            result: CompletedProcess[str] = subprocess.run(
                 cmd[:-1] + ["shell", "ip", "addr", "show", "wlan0"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
                 timeout=5,
             )
 
@@ -307,16 +309,16 @@ class ADBConnection:
             (成功，消息) 元组。
         """
         try:
-            # Kill server - 使用静默模式
-            CommandExecutor.run_silent(
-                [self.adb_path, "kill-server"], timeout=5
+            # Kill server
+            subprocess.run(
+                [self.adb_path, "kill-server"], capture_output=True, timeout=5
             )
 
             time.sleep(TIMING_CONFIG.connection.server_restart_delay)
 
-            # Start server - 使用静默模式
-            CommandExecutor.run_silent(
-                [self.adb_path, "start-server"], timeout=5
+            # Start server
+            subprocess.run(
+                [self.adb_path, "start-server"], capture_output=True, timeout=5
             )
 
             return True, "ADB server restarted"
