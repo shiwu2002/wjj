@@ -110,22 +110,49 @@ class ModelClient:
         )
 
         raw_content = ""
+        reasoning_content = ""  # Store reasoning/thinking content for Qwen models
         buffer = ""  # Buffer to hold content that might be part of a marker
         action_markers = ["finish(message=", "do(action="]
         in_action_phase = False  # Track if we've entered the action phase
         first_token_received = False
+        in_reasoning_phase = True  # Track if we're still in reasoning phase
 
         for chunk in stream:  # type: ignore[attr-defined]
             if len(chunk.choices) == 0:  # type: ignore[arg-type]
                 continue
-            if chunk.choices[0].delta.content is not None:  # type: ignore[union-attr]
-                content: str = chunk.choices[0].delta.content  # type: ignore[union-attr]
+
+            choice = chunk.choices[0]  # type: ignore[attr-defined]
+
+            # Handle reasoning_content (Qwen models thinking process)
+            if hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content is not None:
+                reasoning_part = choice.delta.reasoning_content  # type: ignore[union-attr]
+                reasoning_content += reasoning_part
+
+                # Record time to first token (reasoning counts as first token)
+                if not first_token_received:
+                    time_to_first_token = time.time() - start_time
+                    first_token_received = True
+
+                # Print reasoning content in real-time
+                print(reasoning_part, end="", flush=True)
+
+            # Handle regular content
+            if choice.delta.content is not None:  # type: ignore[union-attr]
+                content: str = choice.delta.content  # type: ignore[union-attr]
                 raw_content += content
 
                 # Record time to first token
                 if not first_token_received:
                     time_to_first_token = time.time() - start_time
                     first_token_received = True
+
+                # Transition from reasoning to content phase
+                if in_reasoning_phase and reasoning_content:
+                    print()  # Newline after reasoning
+                    in_reasoning_phase = False
+                    # Record time to thinking end
+                    if time_to_thinking_end is None:
+                        time_to_thinking_end = time.time() - start_time
 
                 if in_action_phase:
                     # Already in action phase, just accumulate content without printing
@@ -190,8 +217,13 @@ class ModelClient:
         # Calculate total time
         total_time = time.time() - start_time
 
-        # Parse thinking and action from response
-        thinking, action = self._parse_response(raw_content)
+        # Use reasoning_content as thinking if available, otherwise parse from raw_content
+        if reasoning_content:
+            thinking = reasoning_content
+            _, action = self._parse_response(raw_content)
+        else:
+            # Parse thinking and action from response
+            thinking, action = self._parse_response(raw_content)
 
         # Print performance metrics
         lang = self.config.lang
@@ -359,8 +391,13 @@ class ModelClient:
             choice = response.choices[0]
             message = choice.message
 
-            # Ollama uses 'reasoning' field in OpenAI compat mode
-            thinking = getattr(message, 'reasoning', None) or getattr(message, 'thinking', None) or ''
+            # Try multiple fields for thinking/reasoning (Qwen uses 'reasoning_content', Ollama uses 'reasoning')
+            thinking = (
+                getattr(message, 'reasoning_content', None) or  # Qwen models
+                getattr(message, 'reasoning', None) or  # Ollama models
+                getattr(message, 'thinking', None) or  # Other models
+                ''
+            )
             content = message.content or ''
 
             # If no reasoning field, try to parse from content
@@ -423,23 +460,49 @@ class ModelClient:
         )
 
         raw_content = ""
+        reasoning_content = ""  # Store reasoning/thinking content for Qwen models
         buffer = ""
         action_markers = ["finish(message=", "do(action="]
         in_action_phase = False
         first_token_received = False
         time_to_first_token = None
         time_to_thinking_end = None
+        in_reasoning_phase = True  # Track if we're still in reasoning phase
 
         for chunk in stream:
             if len(chunk.choices) == 0:
                 continue
-            if chunk.choices[0].delta.content is not None:
-                content = chunk.choices[0].delta.content
+
+            choice = chunk.choices[0]
+
+            # Handle reasoning_content (Qwen models thinking process)
+            if hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content is not None:
+                reasoning_part = choice.delta.reasoning_content
+                reasoning_content += reasoning_part
+
+                # Record time to first token
+                if not first_token_received:
+                    time_to_first_token = time.time() - start_time
+                    first_token_received = True
+
+                # Print reasoning content in real-time
+                print(reasoning_part, end="", flush=True)
+
+            # Handle regular content
+            if choice.delta.content is not None:
+                content = choice.delta.content
                 raw_content += content
 
                 if not first_token_received:
                     time_to_first_token = time.time() - start_time
                     first_token_received = True
+
+                # Transition from reasoning to content phase
+                if in_reasoning_phase and reasoning_content:
+                    print()  # Newline after reasoning
+                    in_reasoning_phase = False
+                    if time_to_thinking_end is None:
+                        time_to_thinking_end = time.time() - start_time
 
                 if in_action_phase:
                     continue
@@ -488,7 +551,13 @@ class ModelClient:
                     buffer = ""
 
         total_time = time.time() - start_time
-        thinking, action = self._parse_response(raw_content)
+
+        # Use reasoning_content as thinking if available, otherwise parse from raw_content
+        if reasoning_content:
+            thinking = reasoning_content
+            _, action = self._parse_response(raw_content)
+        else:
+            thinking, action = self._parse_response(raw_content)
 
         print()
         print("=" * 50)
