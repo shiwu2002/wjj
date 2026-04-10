@@ -39,6 +39,12 @@ APP_PACKAGES: dict[str, str] = {
     "优酷视频": "com.youku.phone",
     "芒果TV": "com.hunantv.imgo.activity",
     "红果短剧": "com.phoenix.read",
+    # 应用商店
+    "vivo 应用商店": "com.bbk.appstore",
+    "应用商店": "com.bbk.appstore",
+    "华为应用市场": "com.huawei.appmarket",
+    "小米应用商店": "com.xiaomi.market",
+    "OPPO 软件商店": "com.heytap.appmarket",
     # 音乐与音频
     "网易云音乐": "com.netease.cloudmusic",
     "QQ音乐": "com.tencent.qqmusic",
