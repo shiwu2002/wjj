@@ -1,0 +1,53 @@
+{
+  "model": {
+    "type": "remote",
+    "base_url": "https://api-inference.modelscope.cn/v1",
+    "model_name": "Qwen/Qwen3.5-27B",
+    "api_key": "ms-fd50204a-9b29-40e0-a29a-1af24569e10f",
+    "use_thinking": false
+  },
+  "agent": {
+    "max_steps": 0,
+    "device_id": null,
+    "verbose": true,
+    "lang": "cn"
+  },
+  "device": {
+    "type": "adb",
+    "remote_address": null,
+    "auto_connect": true
+  },
+  "command_window": {
+    "enabled": true,
+    "auto_close_delay": 1
+  },
+  "coordinate_optimization": {
+    "enabled": true,
+    "click_offset_x": 8,
+    "click_offset_y": 8,
+    "use_region_click": true,
+    "min_click_region": 30
+  },
+  "timing": {
+    "action": {
+      "keyboard_switch_delay": 1.0,
+      "text_clear_delay": 1.0,
+      "text_input_delay": 1.0,
+      "keyboard_restore_delay": 1.0
+    },
+    "device": {
+      "default_tap_delay": 1.0,
+      "default_double_tap_delay": 1.0,
+      "double_tap_interval": 0.1,
+      "default_long_press_delay": 1.0,
+      "default_swipe_delay": 1.0,
+      "default_back_delay": 1.0,
+      "default_home_delay": 1.0,
+      "default_launch_delay": 1.0
+    },
+    "connection": {
+      "adb_restart_delay": 2.0,
+      "server_restart_delay": 1.0
+    }
+  }
+}

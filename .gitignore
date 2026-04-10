@@ -1,0 +1,50 @@
+# Python 编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python 包和构建输出
+*.egg-info/
+build/
+dist/
+*.egg
+
+# 虚拟环境
+.env
+.venv
+venv/
+ENV/
+env/
+
+# 测试相关文件
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE 配置文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 配置文件（包含敏感信息，建议忽略）
+# config.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# mypy 缓存
+.mypy_cache/
+
+# black 缓存
+.black

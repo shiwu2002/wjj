@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import requests; r = requests.get\\(''http://localhost:11434/api/tags'', timeout=3\\); print\\(''Status:'', r.status_code\\); print\\(''Response:'', r.json\\(\\)\\)\")",
+      "Bash(python main.py --config)",
+      "Bash(python -c \":*)",
+      "Bash(python -m json.tool)",
+      "Bash(python main.py --help)",
+      "Bash(timeout 30 python main.py \"测试\")",
+      "Bash(timeout 60 python main.py \"测试\")",
+      "Bash(timeout 90 python main.py \"测试\")",
+      "Bash(curl -X POST http://localhost:11434/api/chat -H \"Content-Type: application/json\" -d '{:*)",
+      "Bash(ollama list:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(timeout 60 python -c \":*)",
+      "Bash(python main.py --verbose \"打开微信\")",
+      "Bash(adb shell:*)",
+      "Bash(adb -s 10AC9A0JL600219 shell ime list -s)",
+      "Bash(adb -s 10AC9A0JL600219 shell dumpsys window)",
+      "Bash(findstr -i \" mCurrentFocus\\\\|mCurrentActivity\")",
+      "Bash(Select-String -Pattern \"mCurrentFocus\" -Context 2)",
+      "Bash(python -c \"from phone_agent.adb.device import get_current_app; print\\(get_current_app\\(\\)\\)\")",
+      "Bash(python -c \"from phone_agent.adb.device import get_current_app; print\\(''Current app:'', get_current_app\\(\\)\\)\")",
+      "Bash(python -c \"from phone_agent.adb.screenshot import get_screenshot; s = get_screenshot\\(enable_compression=True\\); print\\(f''OK: {s.width}x{s.height}''\\)\")",
+      "Bash(python3 -c \":*)",
+      "Bash(python -c \"from phone_agent.batch_runner import BatchQuestionRunner, BatchConfig; print\\(''batch_runner imports OK''\\)\")"
+    ]
+  }
+}
