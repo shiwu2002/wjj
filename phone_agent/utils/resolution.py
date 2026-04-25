@@ -7,9 +7,8 @@
 - 添加点击偏移量提高容错率（针对小参数模型定位不准）
 - 支持区域点击而非精确点点击
 """
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional
 from PIL import Image
-import io
 import json
 from pathlib import Path
 
@@ -101,15 +100,6 @@ class ResolutionConverter:
 
         return compressed_image
 
-    def get_conversion_info(self) -> Dict[str, Any]:
-        """获取转换信息"""
-        return {
-            'original_size': (self.original_width, self.original_height),
-            'scaled_size': (self.scaled_width, self.scaled_height),
-            'scale_ratio': self.scale_ratio,
-            'target_size': (self.TARGET_WIDTH, self.TARGET_HEIGHT)
-        }
-
 
 class CoordinateMapper:
     """
@@ -170,14 +160,6 @@ class CoordinateMapper:
             converter.scaled_width,
             converter.scaled_height
         )
-
-    def to_1k_coordinate(self, x: float, y: float) -> Tuple[int, int]:
-        """将原始坐标转换为 1K 坐标"""
-        scaled_x = int(x * self.scale_x)
-        scaled_y = int(y * self.scale_y)
-        scaled_x = max(0, min(scaled_x, self.scaled_width - 1))
-        scaled_y = max(0, min(scaled_y, self.scaled_height - 1))
-        return scaled_x, scaled_y
 
     def to_original_coordinate(self, x: float, y: float,
                                add_click_offset: bool = True) -> Tuple[int, int]:
@@ -269,12 +251,3 @@ class CoordinateMapper:
         offset_y = original_y_precise - int(original_y_precise)
 
         return offset_x, offset_y
-
-    def get_mapping_info(self) -> Dict[str, Any]:
-        """获取映射信息"""
-        return {
-            'original_resolution': (self.original_width, self.original_height),
-            'scaled_resolution': (self.scaled_width, self.scaled_height),
-            'scale_ratio': (self.scale_x, self.scale_y),
-            'inverse_scale_ratio': (self.inverse_scale_x, self.inverse_scale_y)
-        }
